@@ -1,35 +1,46 @@
+# app.py
+
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
+
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, confusion_matrix
-import seaborn as sns
-import matplotlib.pyplot as plt
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
 
-st.title("Titanic Survival Prediction")
+st.title("Titanic Survival Prediction - Logistic Regression")
 
-file = st.file_uploader("Upload Titanic CSV", type="csv")
+# -----------------------------
+# Upload Dataset
+# -----------------------------
 
-if file is not None:
+uploaded_file = st.file_uploader("Upload Titanic CSV file", type=["csv"])
 
-    df = pd.read_csv(file)
+if uploaded_file is not None:
 
-    # Handle missing values
+    df = pd.read_csv(uploaded_file)
+
+    st.subheader("Raw Dataset")
+    st.dataframe(df.head())
+
+    # -----------------------------
+    # Data Preprocessing
+    # -----------------------------
+
     df['Age'] = df['Age'].fillna(df['Age'].median())
     df['Fare'] = df['Fare'].fillna(df['Fare'].median())
-    df.dropna(subset=['Embarked'], inplace=True)
+    df = df.dropna(subset=['Embarked'])
 
-    # Convert categorical variables
     df = pd.get_dummies(df, columns=['Sex', 'Embarked'], drop_first=True)
 
-    features = [
-        'Pclass', 'Age', 'SibSp', 'Parch', 'Fare',
-        'Sex_male', 'Embarked_Q', 'Embarked_S'
-    ]
-
-    X = df[features]
+    X = df[['Pclass', 'Age', 'SibSp', 'Parch', 'Fare',
+            'Sex_male', 'Embarked_Q', 'Embarked_S']]
     y = df['Survived']
+
+    # -----------------------------
+    # Train-Test Split
+    # -----------------------------
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
@@ -39,21 +50,42 @@ if file is not None:
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
 
+    # -----------------------------
+    # Model Training
+    # -----------------------------
+
     model = LogisticRegression(max_iter=1000)
     model.fit(X_train, y_train)
 
     y_pred = model.predict(X_test)
 
     accuracy = accuracy_score(y_test, y_pred)
-    st.write(f"Accuracy: {accuracy:.2f}")
+
+    st.subheader("Model Performance")
+    st.write(f"Accuracy: {round(accuracy, 3)}")
+
+    st.text("Classification Report:")
+    st.text(classification_report(y_test, y_pred))
+
+    # -----------------------------
+    # Confusion Matrix Plot
+    # -----------------------------
+
+    st.subheader("Confusion Matrix")
+
+    cm = confusion_matrix(y_test, y_pred)
 
     fig, ax = plt.subplots()
-    sns.heatmap(
-        confusion_matrix(y_test, y_pred),
-        annot=True,
-        cmap="Blues",
-        fmt="d",
-        ax=ax
-    )
-    ax.set_title("Confusion Matrix")
+    cax = ax.matshow(cm)
+    fig.colorbar(cax)
+
+    for (i, j), val in pd.DataFrame(cm).stack().items():
+        ax.text(j, i, int(val), ha='center', va='center')
+
+    ax.set_xlabel('Predicted')
+    ax.set_ylabel('Actual')
+
     st.pyplot(fig)
+
+else:
+    st.info("Please upload the Titanic dataset CSV file.")
